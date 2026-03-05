@@ -11,6 +11,7 @@ import {
   MagnifyingGlassIcon,
   CheckCircleIcon,
   TimerIcon,
+  SpinnerIcon,
 } from "@phosphor-icons/react"
 
 import type { CookieEntry, PlaytimeEntry, SpendGroup } from "./types"
@@ -24,6 +25,7 @@ interface DetailDialogProps {
 export function DetailDialog({ entry, onClose }: DetailDialogProps) {
   const r = entry.result!
   const u = r.user!
+  const loading = !r.detailsLoaded
   const txns = r.transactions ?? []
   const spendGroups = React.useMemo(() => groupTransactions(txns), [txns])
 
@@ -110,28 +112,37 @@ export function DetailDialog({ entry, onClose }: DetailDialogProps) {
             <StatCell label="Balance" value={fmt(r.robux)} />
             <StatCell
               label="Credit"
-              value={r.creditBalance != null ? `$${r.creditBalance.toFixed(2)}` : "—"}
+              value={loading ? "…" : r.creditBalance != null ? `$${r.creditBalance.toFixed(2)}` : "—"}
             />
-            <StatCell label="RAP" value={fmt(r.rap)} />
-            <StatCell label="Total Spent" value={fmt(r.totalSpent ?? null)} />
+            <StatCell label="RAP" value={loading ? "…" : fmt(r.rap)} />
+            <StatCell label="Total Spent" value={loading ? "…" : fmt(r.totalSpent ?? null)} />
           </div>
 
           {/* Info grid */}
           <div className="grid shrink-0 grid-cols-5 gap-px border-b bg-border text-[11px]">
             <InfoCell
               label="Card"
-              value={r.hasLinkedCard == null ? "—" : r.hasLinkedCard ? "Yes" : "No"}
+              value={loading ? "…" : r.hasLinkedCard == null ? "—" : r.hasLinkedCard ? "Yes" : "No"}
               highlight={r.hasLinkedCard === true}
             />
             <InfoCell
               label="Email"
-              value={r.emailVerified == null ? "—" : r.emailVerified ? "Verified" : "Unverified"}
+              value={loading ? "…" : r.emailVerified == null ? "—" : r.emailVerified ? "Verified" : "Unverified"}
             />
-            <InfoCell label="Birthdate" value={r.birthdate ?? "—"} />
-            <InfoCell label="Age" value={calcAge(r.birthdate)} />
-            <InfoCell label="Pending" value={fmt(r.pendingRobux)} />
+            <InfoCell label="Birthdate" value={loading ? "…" : r.birthdate ?? "—"} />
+            <InfoCell label="Age" value={loading ? "…" : calcAge(r.birthdate)} />
+            <InfoCell label="Pending" value={loading ? "…" : fmt(r.pendingRobux)} />
           </div>
 
+          {loading && (
+            <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
+              <SpinnerIcon className="size-4 animate-spin" />
+              Loading details…
+            </div>
+          )}
+
+          {!loading && (
+            <>
           {/* Tabs */}
           <div className="flex shrink-0 border-b">
             <TabButton
@@ -226,6 +237,8 @@ export function DetailDialog({ entry, onClose }: DetailDialogProps) {
               </div>
             )}
           </div>
+            </>
+          )}
         </div>
       </div>
     </>

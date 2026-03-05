@@ -136,31 +136,45 @@ export function CookieChecker() {
       while (cursor < init.length && !abortRef.current) {
         const i = cursor++
         updateEntry(i, { status: "checking" })
-        try {
-          const res = await fetch("/api/check", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cookieValue: init[i].value }),
-          })
-          const data = await res.json()
 
-          if (res.status === 429) {
-            cursor--
-            updateEntry(i, { status: "pending" })
-            await new Promise((r) => setTimeout(r, 3000 + Math.random() * 2000))
-            continue
+        let lastError: string | null = null
+        let success = false
+
+        for (let attempt = 0; attempt < 3 && !abortRef.current; attempt++) {
+          try {
+            const res = await fetch("/api/check", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ cookieValue: init[i].value }),
+            })
+
+            if (res.status === 429 || res.status === 502 || res.status === 503) {
+              lastError = `Server returned ${res.status}`
+              const delay = res.status === 429
+                ? 3000 + Math.random() * 2000
+                : 1000 * Math.pow(2, attempt) + Math.random() * 500
+              await new Promise((r) => setTimeout(r, delay))
+              continue
+            }
+
+            const data = await res.json()
+            updateEntry(i, {
+              status: data.error ? "error" : "done",
+              result: data.error ? null : data,
+              error: data.error ?? null,
+            })
+            success = true
+            break
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : "Network error"
+            if (attempt < 2) {
+              await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)))
+            }
           }
+        }
 
-          updateEntry(i, {
-            status: data.error ? "error" : "done",
-            result: data.error ? null : data,
-            error: data.error ?? null,
-          })
-        } catch (err) {
-          updateEntry(i, {
-            status: "error",
-            error: err instanceof Error ? err.message : "Error",
-          })
+        if (!success && !abortRef.current) {
+          updateEntry(i, { status: "error", error: lastError ?? "Failed after retries" })
         }
       }
     }
@@ -199,6 +213,44 @@ export function CookieChecker() {
     setFilter("all")
     abortRef.current = true
     setChecking(false)
+  }
+
+  async function handleSelectRow(entry: CookieEntry) {
+    if (entry.status !== "done" || !entry.result?.valid) return
+    setSelectedId(entry.id)
+
+    if (entry.result.detailsLoaded || entry.detailStatus === "loading") return
+
+    updateEntry(entry.id, { detailStatus: "loading" })
+    try {
+      const res = await fetch("/api/check/details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cookieValue: entry.value,
+          userId: entry.result.user!.id,
+        }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        updateEntry(entry.id, { detailStatus: "error" })
+      } else {
+        setEntries((prev) => {
+          const next = [...prev]
+          const idx = next.findIndex((e) => e.id === entry.id)
+          if (idx !== -1) {
+            next[idx] = {
+              ...next[idx],
+              result: { ...next[idx].result!, ...data },
+              detailStatus: "done",
+            }
+          }
+          return next
+        })
+      }
+    } catch {
+      updateEntry(entry.id, { detailStatus: "error" })
+    }
   }
 
   const hasResults = entries.length > 0
@@ -427,7 +479,7 @@ export function CookieChecker() {
                             entry={entry}
                             idx={idx}
                             isSelected={selectedId === entry.id}
-                            onSelect={setSelectedId}
+                            onSelect={handleSelectRow}
                             style={{
                               position: "absolute",
                               top: 0,
@@ -453,6 +505,10 @@ export function CookieChecker() {
           )}
         </div>
       </div>
+
+      <footer className="py-3 text-center text-[11px] text-muted-foreground/50">
+        v{process.env.APP_VERSION}
+      </footer>
 
       {selected && selected.result?.valid && (
         <DetailDialog entry={selected} onClose={() => setSelectedId(null)} />
@@ -529,7 +585,7 @@ const VirtualRow = React.memo(function VirtualRow({
   entry: CookieEntry
   idx: number
   isSelected: boolean
-  onSelect: (id: number) => void
+  onSelect: (entry: CookieEntry) => void
   style: React.CSSProperties
 }) {
   const v = entry.result?.valid
@@ -539,7 +595,7 @@ const VirtualRow = React.memo(function VirtualRow({
     <div
       role="row"
       style={style}
-      onClick={() => entry.status === "done" && onSelect(entry.id)}
+      onClick={() => entry.status === "done" && onSelect(entry)}
       className={`grid ${GRID_COLS} cursor-pointer items-center border-b border-dashed px-4 text-xs transition-colors ${
         isSelected ? "bg-muted/60" : "hover:bg-muted/30"
       }`}

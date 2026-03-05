@@ -10,9 +10,17 @@ export function fmt(n: number | null | undefined): string {
   return n.toLocaleString()
 }
 
+function sanitizeCookie(s: string): string {
+  return s
+    .replace(/^\uFEFF/, "")     // strip BOM
+    .replace(/[\r\n\t]/g, "")   // strip control chars
+    .replace(/\s+$/, "")        // trailing whitespace
+    .replace(/^\s+/, "")        // leading whitespace
+}
+
 export function parseCookieLines(raw: string): string[] {
   const matches = raw.match(COOKIE_RE)
-  if (matches) return [...new Set(matches)]
+  if (matches) return [...new Set(matches.map(sanitizeCookie))]
 
   const lines = raw
     .split(/\r?\n/)
@@ -25,18 +33,18 @@ export function parseCookieLines(raw: string): string[] {
 
     const robloMatch = l.match(/\.ROBLOSECURITY=([^\s;]+)/)
     if (robloMatch) {
-      results.push(robloMatch[1])
+      results.push(sanitizeCookie(robloMatch[1]))
       continue
     }
 
     const parts = l.split(/[:\s;|]+/)
     const token = parts.find((p) => p.length > 100)
     if (token) {
-      results.push(token)
+      results.push(sanitizeCookie(token))
       continue
     }
 
-    if (l.length > 50) results.push(l)
+    if (l.length > 50) results.push(sanitizeCookie(l))
   }
   return [...new Set(results)]
 }

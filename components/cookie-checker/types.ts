@@ -42,6 +42,7 @@ export interface AccountInfo {
   screenTime?: ScreenTimeResult | null
   playtime?: PlaytimeEntry[]
   totalPlaytimeMinutes?: number
+  detailsLoaded?: boolean
 }
 
 export interface CookieEntry {
@@ -50,6 +51,7 @@ export interface CookieEntry {
   status: "pending" | "checking" | "done" | "error"
   result: AccountInfo | null
   error: string | null
+  detailStatus?: "idle" | "loading" | "done" | "error"
 }
 
 export interface SpendGroup {
