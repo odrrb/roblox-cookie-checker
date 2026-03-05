@@ -65,6 +65,8 @@ export function sortVal(e: CookieEntry, col: SortCol, i: number): string | numbe
       return e.result.hasLinkedCard ? 1 : 0
     case "spent":
       return e.result.totalSpent ?? -1
+    case "playtime":
+      return e.result.totalPlaytimeMinutes ?? -1
   }
 }
 
@@ -90,10 +92,11 @@ export function calcAge(birthdate: string | null | undefined): string {
 export function groupTransactions(txns: TransactionItem[]): SpendGroup[] {
   const map = new Map<string, SpendGroup>()
   for (const t of txns) {
-    let g = map.get(t.type)
+    const key = t.game
+    let g = map.get(key)
     if (!g) {
-      g = { type: t.type, items: [], total: 0 }
-      map.set(t.type, g)
+      g = { type: key, items: [], total: 0 }
+      map.set(key, g)
     }
     g.items.push(t)
     g.total += t.amount

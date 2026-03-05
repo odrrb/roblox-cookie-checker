@@ -1,6 +1,7 @@
 export interface TransactionItem {
   name: string
   type: string
+  game: string
   amount: number
   created: string
 }
@@ -60,6 +61,6 @@ export interface SpendGroup {
   total: number
 }
 
-export type SortCol = "index" | "status" | "username" | "robux" | "rap" | "card" | "spent"
+export type SortCol = "index" | "status" | "username" | "robux" | "rap" | "card" | "spent" | "playtime"
 export type SortDir = "asc" | "desc"
 export type FilterMode = "all" | "valid" | "invalid" | "pending"

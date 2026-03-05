@@ -67,6 +67,7 @@ interface Paginated<T> {
 interface TransactionItem {
   name: string
   type: string
+  game: string
   amount: number
   created: string
 }
@@ -115,6 +116,7 @@ async function fetchTransactions(userId: number, cookie: string): Promise<Transa
         txns.push({
           name: t.details?.name ?? "Unknown",
           type: t.details?.type ?? "Unknown",
+          game: t.agent?.name ?? "Unknown",
           amount: Math.abs(t.currency?.amount ?? 0),
           created: t.created,
         })
@@ -207,6 +209,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const [
+      currencyRes,
+      userInfoRes,
+      avatarRes,
       premiumRes,
       rapResult,
       txnsResult,
@@ -217,6 +222,12 @@ export async function POST(request: NextRequest) {
       paymentProfilesRes,
       screenTimeResult,
     ] = await Promise.allSettled([
+      robloxFetch("https://economy.roblox.com/v1/user/currency", cookie, 1),
+      robloxFetch(`https://users.roblox.com/v1/users/${userId}`, cookie, 1),
+      fetch(
+        `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=150x150&format=Png&isCircular=false`,
+        { headers: { "User-Agent": UA }, cache: "no-store" },
+      ),
       robloxFetch(`https://premiumfeatures.roblox.com/v1/users/${userId}/validate`, cookie, 1),
       fetchRAP(userId, cookie),
       fetchTransactions(userId, cookie),
@@ -230,6 +241,23 @@ export async function POST(request: NextRequest) {
       robloxFetch("https://apis.roblox.com/payments-gateway/v1/payment-profiles", cookie, 1),
       fetchScreenTime(userId, cookie),
     ])
+
+    const currency =
+      currencyRes.status === "fulfilled" && currencyRes.value.ok
+        ? await jsonOrNull<{ robux: number }>(currencyRes.value)
+        : null
+
+    interface UserInfo { created?: string; isBanned?: boolean; hasVerifiedBadge?: boolean }
+    let userInfo: UserInfo | null = null
+    if (userInfoRes.status === "fulfilled" && userInfoRes.value.ok) {
+      userInfo = await jsonOrNull<UserInfo>(userInfoRes.value)
+    }
+
+    let avatarUrl: string | null = null
+    if (avatarRes.status === "fulfilled" && avatarRes.value.ok) {
+      const d = await jsonOrNull<{ data: { imageUrl: string }[] }>(avatarRes.value)
+      avatarUrl = d?.data?.[0]?.imageUrl ?? null
+    }
 
     let premium: boolean | null = null
     if (premiumRes.status === "fulfilled" && premiumRes.value.ok) {
@@ -297,6 +325,11 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
+      robux: currency?.robux ?? null,
+      created: userInfo?.created ?? null,
+      isBanned: userInfo?.isBanned ?? null,
+      hasVerifiedBadge: userInfo?.hasVerifiedBadge ?? null,
+      avatarUrl,
       premium,
       rap: rapResult.status === "fulfilled" ? rapResult.value : null,
       transactions,

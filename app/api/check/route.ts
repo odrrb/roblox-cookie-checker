@@ -104,42 +104,9 @@ export async function POST(request: NextRequest) {
     const auth = await jsonOrNull<{ id: number; name: string; displayName: string }>(authRes)
     if (!auth?.id) return NextResponse.json({ valid: false })
 
-    const userId = auth.id
-
-    const [currencyRes, userInfoRes, avatarRes] = await Promise.allSettled([
-      robloxFetch("https://economy.roblox.com/v1/user/currency", cookie, 1),
-      robloxFetch(`https://users.roblox.com/v1/users/${userId}`, cookie, 1),
-      fetch(
-        `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=150x150&format=Png&isCircular=false`,
-        { headers: { "User-Agent": UA }, cache: "no-store" },
-      ),
-    ])
-
-    const currency =
-      currencyRes.status === "fulfilled" && currencyRes.value.ok
-        ? await jsonOrNull<{ robux: number }>(currencyRes.value)
-        : null
-
-    interface UserInfo { created?: string; isBanned?: boolean; hasVerifiedBadge?: boolean }
-    let userInfo: UserInfo | null = null
-    if (userInfoRes.status === "fulfilled" && userInfoRes.value.ok) {
-      userInfo = await jsonOrNull<UserInfo>(userInfoRes.value)
-    }
-
-    let avatarUrl: string | null = null
-    if (avatarRes.status === "fulfilled" && avatarRes.value.ok) {
-      const d = await jsonOrNull<{ data: { imageUrl: string }[] }>(avatarRes.value)
-      avatarUrl = d?.data?.[0]?.imageUrl ?? null
-    }
-
     return NextResponse.json({
       valid: true,
       user: { id: auth.id, name: auth.name, displayName: auth.displayName },
-      robux: currency?.robux ?? null,
-      created: userInfo?.created ?? null,
-      isBanned: userInfo?.isBanned ?? null,
-      hasVerifiedBadge: userInfo?.hasVerifiedBadge ?? null,
-      avatarUrl,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error"

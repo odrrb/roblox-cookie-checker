@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,7 +16,7 @@ import {
 } from "@phosphor-icons/react"
 
 import type { CookieEntry, PlaytimeEntry, SpendGroup } from "./types"
-import { fmt, calcAge, groupTransactions, fmtDuration } from "./helpers"
+import { fmt, fmtDuration, calcAge, groupTransactions } from "./helpers"
 
 interface DetailDialogProps {
   entry: CookieEntry
@@ -61,31 +62,29 @@ export function DetailDialog({ entry, onClose }: DetailDialogProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]" />
+      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
         onClick={onClose}
       >
-        <div
-          role="dialog"
-          aria-label={`Details for ${u.name}`}
-          className="flex h-full max-h-[720px] w-full max-w-xl flex-col overflow-hidden rounded-none border bg-background shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
+        <Card
+          className="flex h-full max-h-[720px] w-full max-w-xl flex-col overflow-hidden"
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex shrink-0 items-center gap-3 border-b px-5 py-3.5">
+          <CardContent className="flex shrink-0 items-center gap-3 border-b p-4">
             {r.avatarUrl ? (
-              <img src={r.avatarUrl} alt="" className="size-10 rounded-full bg-muted" />
+              <img src={r.avatarUrl} alt="" className="size-9 rounded-full bg-muted" />
             ) : (
-              <div className="flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <span className="text-sm font-bold">{u.name[0]?.toUpperCase()}</span>
+              <div className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <span className="text-xs font-bold">{u.name[0]?.toUpperCase()}</span>
               </div>
             )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <p className="truncate text-sm font-semibold">@{u.name}</p>
+                <p className="truncate text-xs font-semibold">@{u.name}</p>
                 {r.hasVerifiedBadge && (
-                  <CheckCircleIcon className="size-3.5 shrink-0 text-primary" weight="fill" />
+                  <CheckCircleIcon className="size-3 shrink-0 text-primary" weight="fill" />
                 )}
                 {r.premium && (
                   <span className="shrink-0 rounded bg-amber-500/10 px-1 py-0.5 text-[9px] font-bold text-amber-600">
@@ -99,192 +98,140 @@ export function DetailDialog({ entry, onClose }: DetailDialogProps) {
                 )}
               </div>
               {u.displayName !== u.name && (
-                <p className="truncate text-[11px] text-muted-foreground">{u.displayName}</p>
+                <p className="truncate text-xs text-muted-foreground">{u.displayName}</p>
               )}
             </div>
             <Button variant="ghost" size="icon-xs" onClick={onClose}>
               <XIcon />
             </Button>
-          </div>
+          </CardContent>
 
-          {/* Primary stats */}
-          <div className="grid shrink-0 grid-cols-4 divide-x border-b">
-            <StatCell label="Balance" value={fmt(r.robux)} />
-            <StatCell
-              label="Credit"
-              value={loading ? "…" : r.creditBalance != null ? `$${r.creditBalance.toFixed(2)}` : "—"}
-            />
-            <StatCell label="RAP" value={loading ? "…" : fmt(r.rap)} />
-            <StatCell label="Total Spent" value={loading ? "…" : fmt(r.totalSpent ?? null)} />
+          {/* Financial */}
+          <div className="shrink-0 grid grid-cols-3 divide-x border-b">
+            <GridCell label="Balance" value={fmt(r.robux)} />
+            <GridCell label="RAP" value={loading ? "…" : fmt(r.rap)} />
+            <GridCell label="Spent" value={loading ? "…" : fmt(r.totalSpent ?? null)} />
           </div>
-
-          {/* Info grid */}
-          <div className="grid shrink-0 grid-cols-5 gap-px border-b bg-border text-[11px]">
-            <InfoCell
-              label="Card"
-              value={loading ? "…" : r.hasLinkedCard == null ? "—" : r.hasLinkedCard ? "Yes" : "No"}
-              highlight={r.hasLinkedCard === true}
-            />
-            <InfoCell
-              label="Email"
-              value={loading ? "…" : r.emailVerified == null ? "—" : r.emailVerified ? "Verified" : "Unverified"}
-            />
-            <InfoCell label="Birthdate" value={loading ? "…" : r.birthdate ?? "—"} />
-            <InfoCell label="Age" value={loading ? "…" : calcAge(r.birthdate)} />
-            <InfoCell label="Pending" value={loading ? "…" : fmt(r.pendingRobux)} />
+          <div className="shrink-0 grid grid-cols-3 divide-x border-b">
+            <GridCell label="Pending" value={loading ? "…" : fmt(r.pendingRobux)} />
+            <GridCell label="Card" value={loading ? "…" : r.hasLinkedCard == null ? "—" : r.hasLinkedCard ? "Yes" : "No"} highlight={r.hasLinkedCard === true} />
+            <GridCell label="Email" value={loading ? "…" : r.emailVerified == null ? "—" : r.emailVerified ? "Verified" : "Unverified"} />
+          </div>
+          <div className="shrink-0 grid grid-cols-3 divide-x border-b">
+            <GridCell label="Birthdate" value={loading ? "…" : r.birthdate ?? "—"} />
+            <GridCell label="Age" value={loading ? "…" : calcAge(r.birthdate)} />
+            <GridCell label="Playtime" value={loading ? "…" : r.totalPlaytimeMinutes != null ? fmtDuration(r.totalPlaytimeMinutes) : "—"} />
           </div>
 
           {loading && (
-            <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <SpinnerIcon className="size-4 animate-spin" />
+            <div className="flex flex-1 items-center justify-center gap-2 text-xs text-muted-foreground">
+              <SpinnerIcon className="size-3.5 animate-spin" />
               Loading details…
             </div>
           )}
 
           {!loading && (
             <>
-          {/* Tabs */}
-          <div className="flex shrink-0 border-b">
-            <TabButton
-              active={activeTab === "playtime"}
-              onClick={() => setActiveTab("playtime")}
-              icon={<TimerIcon className="size-3.5" />}
-              label="Playtime"
-              count={playtime.length}
-            />
-            <TabButton
-              active={activeTab === "robux"}
-              onClick={() => setActiveTab("robux")}
-              icon={<CurrencyCircleDollarIcon className="size-3.5" />}
-              label="Robux Spent"
-              count={txns.length}
-            />
-          </div>
-
-          {/* Search */}
-          <div className="shrink-0 border-b px-4 py-2.5">
-            <div className="relative">
-              <MagnifyingGlassIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              {activeTab === "playtime" ? (
-                <Input
-                  placeholder="Search games..."
-                  value={playtimeSearch}
-                  onChange={(e) => setPlaytimeSearch(e.target.value)}
-                  className="pl-8"
+              {/* Tabs */}
+              <div className="flex shrink-0 border-b">
+                <TabButton
+                  active={activeTab === "playtime"}
+                  onClick={() => setActiveTab("playtime")}
+                  icon={<TimerIcon className="size-3" />}
+                  label="Playtime"
+                  count={playtime.length}
                 />
-              ) : (
-                <Input
-                  placeholder="Search transactions..."
-                  value={robuxSearch}
-                  onChange={(e) => setRobuxSearch(e.target.value)}
-                  className="pl-8"
+                <TabButton
+                  active={activeTab === "robux"}
+                  onClick={() => setActiveTab("robux")}
+                  icon={<CurrencyCircleDollarIcon className="size-3" />}
+                  label="Robux Spent"
+                  count={txns.length}
                 />
-              )}
-            </div>
-          </div>
+              </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === "playtime" ? (
-              <div>
-                {(playtime.length > 0 || (screenTime && screenTime.totalWeeklyMinutes > 0)) && (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b bg-muted/30 px-4 py-2 text-[11px]">
-                    <span className="font-medium">
-                      {playtime.length} game{playtime.length !== 1 ? "s" : ""}
-                    </span>
-                    {screenTime && screenTime.totalWeeklyMinutes > 0 && (
-                      <span className="font-medium text-primary">
-                        {fmtDuration(screenTime.totalWeeklyMinutes)} total this week
-                      </span>
-                    )}
-                    {totalPlaytime > 0 && totalPlaytime !== screenTime?.totalWeeklyMinutes && (
-                      <span className="text-muted-foreground">
-                        {fmtDuration(totalPlaytime)} per-game total
-                      </span>
-                    )}
-                  </div>
-                )}
-                <div className="divide-y">
-                  {filteredPlaytime.length === 0 ? (
-                    <EmptyState
-                      text={
-                        playtimeSearch ? "No games match your search" : "No playtime data found"
-                      }
+              {/* Search */}
+              <div className="shrink-0 border-b px-4 py-2">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+                  {activeTab === "playtime" ? (
+                    <Input
+                      placeholder="Search games..."
+                      value={playtimeSearch}
+                      onChange={(e) => setPlaytimeSearch(e.target.value)}
+                      className="pl-8"
                     />
                   ) : (
-                    filteredPlaytime.map((g, i) => (
-                      <PlaytimeRow
-                        key={g.universeId}
-                        entry={g}
-                        rank={i + 1}
-                        totalMinutes={totalPlaytime}
-                      />
-                    ))
+                    <Input
+                      placeholder="Search transactions..."
+                      value={robuxSearch}
+                      onChange={(e) => setRobuxSearch(e.target.value)}
+                      className="pl-8"
+                    />
                   )}
                 </div>
               </div>
-            ) : (
-              <div className="divide-y">
-                {filteredSpendGroups.length === 0 ? (
-                  <EmptyState
-                    text={
-                      robuxSearch ? "No transactions match your search" : "No transactions found"
-                    }
-                  />
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto">
+                {activeTab === "playtime" ? (
+                  <div>
+                    {(playtime.length > 0 || (screenTime && screenTime.totalWeeklyMinutes > 0)) && (
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b bg-muted/30 px-4 py-2 text-xs">
+                        <span className="font-medium">
+                          {playtime.length} game{playtime.length !== 1 ? "s" : ""}
+                        </span>
+                        {screenTime && screenTime.totalWeeklyMinutes > 0 && (
+                          <span className="font-medium text-primary">
+                            {fmtDuration(screenTime.totalWeeklyMinutes)} total this week
+                          </span>
+                        )}
+                        {totalPlaytime > 0 && totalPlaytime !== screenTime?.totalWeeklyMinutes && (
+                          <span className="text-muted-foreground">
+                            {fmtDuration(totalPlaytime)} per-game total
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="divide-y">
+                      {filteredPlaytime.length === 0 ? (
+                        <EmptyState text={playtimeSearch ? "No games match your search" : "No playtime data found"} />
+                      ) : (
+                        filteredPlaytime.map((g, i) => (
+                          <PlaytimeRow key={g.universeId} entry={g} rank={i + 1} totalMinutes={totalPlaytime} />
+                        ))
+                      )}
+                    </div>
+                  </div>
                 ) : (
-                  filteredSpendGroups.map((g) => <SpendGroupRow key={g.type} group={g} />)
+                  <div className="divide-y">
+                    {filteredSpendGroups.length === 0 ? (
+                      <EmptyState text={robuxSearch ? "No transactions match your search" : "No transactions found"} />
+                    ) : (
+                      filteredSpendGroups.map((g) => <SpendGroupRow key={g.type} group={g} />)
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
             </>
           )}
-        </div>
+        </Card>
       </div>
     </>
   )
 }
 
-function StatCell({ label, value }: { label: string; value: string }) {
+function GridCell({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="px-3 py-2.5 text-center">
-      <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">{value}</p>
+      <p className={`font-mono text-xs font-bold tabular-nums ${highlight ? "text-primary" : ""}`}>{value}</p>
+      <p className="mt-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">{label}</p>
     </div>
   )
 }
 
-function InfoCell({
-  label,
-  value,
-  highlight,
-}: {
-  label: string
-  value: string
-  highlight?: boolean
-}) {
-  return (
-    <div className="bg-background px-3 py-2 text-center">
-      <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`mt-0.5 font-mono text-xs font-medium tabular-nums ${highlight ? "text-primary" : ""}`}>
-        {value}
-      </p>
-    </div>
-  )
-}
-
-function TabButton({
-  active,
-  onClick,
-  icon,
-  label,
-  count,
-}: {
-  active: boolean
-  onClick: () => void
-  icon: React.ReactNode
-  label: string
-  count: number
+function TabButton({ active, onClick, icon, label, count }: {
+  active: boolean; onClick: () => void; icon: React.ReactNode; label: string; count: number
 }) {
   return (
     <button
@@ -296,7 +243,7 @@ function TabButton({
       {icon}
       {label}
       <span
-        className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
+        className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
           active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
         }`}
       >
@@ -314,14 +261,8 @@ function EmptyState({ text }: { text: string }) {
   )
 }
 
-function PlaytimeRow({
-  entry,
-  rank,
-  totalMinutes,
-}: {
-  entry: PlaytimeEntry
-  rank: number
-  totalMinutes: number
+function PlaytimeRow({ entry, rank, totalMinutes }: {
+  entry: PlaytimeEntry; rank: number; totalMinutes: number
 }) {
   const pct = totalMinutes > 0 ? (entry.weeklyMinutes / totalMinutes) * 100 : 0
   return (
@@ -330,7 +271,7 @@ function PlaytimeRow({
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{entry.gameName}</p>
         <div className="mt-1 flex items-center gap-2">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+          <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary/60 transition-all"
               style={{ width: `${pct}%` }}
@@ -376,7 +317,10 @@ function SpendGroupRow({ group }: { group: SpendGroup }) {
                 key={i}
                 className="flex items-center justify-between gap-2 text-xs text-muted-foreground"
               >
-                <span className="truncate">{t.name}</span>
+                <div className="min-w-0 flex-1">
+                  <span className="truncate block">{t.name}</span>
+                  <span className="text-[10px] text-muted-foreground/60">{t.type}</span>
+                </div>
                 <span className="shrink-0 font-mono tabular-nums">{fmt(t.amount)}</span>
               </li>
             ))}
