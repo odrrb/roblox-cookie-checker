@@ -4,43 +4,44 @@ A web-based tool for bulk-validating Roblox `.ROBLOSECURITY` cookies and viewing
 
 ## Features
 
-- **Batch checking** — validate hundreds of cookies at once with configurable concurrency (1–50 workers)
+- **Batch checking** — validate hundreds of cookies at once with configurable concurrency (1, 3, 5, or 10 workers)
 - **Flexible input** — drag-and-drop file upload (`.txt`, `.cookie`, `.cookies`) or paste cookies directly
 - **Smart parsing** — auto-detects `_|WARNING:...|_` format, `Cookie:` headers, `.ROBLOSECURITY=` assignments, or raw tokens
-- **Virtualized results table** — handles large lists smoothly with sortable columns and real-time filtering (all / valid / invalid / pending)
-- **Live progress** — progress bar and counters update as cookies are checked, with stop/abort support
+- **Two-phase checking** — fast validation first, then automatic detail fetching for valid accounts in the background
+- **Multi-view UI** — input → progress → results → table flow with compact, centered layout
+- **Live progress** — progress bars, counters, elapsed time, ETA, rate limit warnings, and scrolling logs
+- **Virtualized table** — handles thousands of rows with sortable columns (Robux, RAP, Card, Spent, Playtime)
 
 ### Per-Account Details
 
-Click any valid row to open a detail dialog showing:
+Click any row in the valid table to open a detail dialog showing:
 
 | Info | Description |
 |------|-------------|
 | Robux Balance | Current R$ balance |
-| Credit Balance | USD credit on account |
 | RAP | Recent Average Price of collectibles |
 | Total Spent | Lifetime Robux spent (purchases) |
+| Pending Robux | Pending transaction totals |
 | Linked Card | Whether a payment method is on file |
-| Premium | Active Roblox Premium subscription |
-| Verified Badge | Roblox verified badge status |
 | Email | Email verification status |
 | Birthdate / Age | Account birthdate and calculated age |
-| Pending Robux | Pending transaction totals |
+| Playtime | Weekly total playtime |
+| Premium | Active Roblox Premium subscription |
+| Verified Badge | Roblox verified badge status |
 | Ban Status | Whether the account is banned |
 | Avatar | Account avatar thumbnail |
 
 The detail dialog also includes two searchable tabs:
 
 - **Playtime** — weekly screen time breakdown per game with percentage bars
-- **Robux Spent** — transaction history grouped by type (Game Pass, Developer Product, etc.) with expandable item lists
+- **Robux Spent** — transaction history grouped by game name (for in-game purchases) or "Avatar Shop" (for marketplace items) with expandable item lists
 
 ### Aggregate Statistics
 
-After a batch check completes, view an overall statistics dialog with:
+After a batch check, view an overall statistics dialog with:
 
 - Valid vs. invalid ratio with visual bar
-- Total and average Robux, RAP, and spending across all valid accounts
-- Total credit balance and weekly playtime
+- Total and average Robux, RAP, spending, and playtime across all valid accounts
 - Feature breakdown — percentage of accounts with linked card, Premium, verified badge, and verified email
 - Top accounts — richest, highest RAP, most spent, and most played
 
@@ -78,29 +79,38 @@ npm run build
 npm start
 ```
 
+### Deploy to Vercel
+
+Push to a GitHub repo and import in [Vercel](https://vercel.com). Set the root directory to `checker` if the repo has a parent folder.
+
 ## Project Structure
 
 ```
 app/
-  api/check/route.ts    # Server-side cookie validation endpoint
-  page.tsx              # Root page
-  layout.tsx            # App layout with metadata and fonts
+  api/
+    check/
+      route.ts             # Fast cookie validation (auth + basic user info)
+      details/route.ts     # Detailed account info (robux, RAP, transactions, playtime, etc.)
+  page.tsx                 # Root page
+  layout.tsx               # App layout with metadata and fonts
 components/
   cookie-checker/
-    cookie-checker.tsx  # Main checker UI (input, table, progress)
-    detail-dialog.tsx   # Per-account detail dialog
-    stats-dialog.tsx    # Aggregate statistics dialog
-    helpers.ts          # Parsing, formatting, sorting utilities
-    types.ts            # TypeScript interfaces
-  ui/                   # shadcn/ui primitives
+    cookie-checker.tsx     # Main checker UI (input, progress, results, table views)
+    detail-dialog.tsx      # Per-account detail dialog with playtime and spending tabs
+    stats-dialog.tsx       # Aggregate statistics dialog
+    helpers.ts             # Parsing, formatting, sorting utilities
+    types.ts               # TypeScript interfaces
+    index.ts               # Barrel export
+  ui/                      # shadcn/ui primitives
 ```
 
 ## How It Works
 
 1. Cookies are parsed client-side from file or text input
-2. The frontend sends each cookie to `/api/check` via POST with configurable concurrency
-3. The API route authenticates against Roblox, then fetches account data from multiple Roblox endpoints in parallel (currency, premium, RAP, transactions, screen time, payment profiles, etc.)
-4. Results stream back to the UI and populate the virtualized table in real time
+2. **Fast check**: each cookie is sent to `/api/check` for quick authentication and basic user info
+3. **Detail fetch**: once the fast check completes, `/api/check/details` is called concurrently for all valid cookies to load full account data (robux, RAP, transactions, playtime, payment profiles, etc.)
+4. Results populate a virtualized table; details show loading spinners until they arrive
+5. Transaction data uses the `transaction-records` API to group purchases by game name (in-game) or "Avatar Shop" (marketplace)
 
 ## License
 
