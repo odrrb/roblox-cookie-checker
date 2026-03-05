@@ -78,7 +78,12 @@ interface RawTransaction {
   created: string
   isPending: boolean
   agent?: { id: number; type: string; name: string } | null
-  details?: { id: number; name: string; type: string } | null
+  details?: {
+    id: number
+    name: string
+    type: string
+    place?: { placeId: number; universeId: number; name: string } | null
+  } | null
   currency?: { amount: number; type: string } | null
 }
 
@@ -104,24 +109,26 @@ async function fetchRAP(userId: number, cookie: string): Promise<number | null> 
 
 async function fetchTransactions(userId: number, cookie: string): Promise<TransactionItem[]> {
   const txns: TransactionItem[] = []
-  let cursor: string | null = null
+  let cursor = ""
   for (let i = 0; i < 20; i++) {
-    const url = `https://economy.roblox.com/v2/users/${userId}/transactions?transactionType=Purchase&limit=100&sortOrder=Desc${cursor ? `&cursor=${cursor}` : ""}`
+    const url = `https://apis.roblox.com/transaction-records/v1/users/${userId}/transactions?cursor=${cursor}&limit=100&transactionType=Purchase&itemPricingType=All`
     try {
       const res = await robloxFetch(url, cookie, 1)
       if (!res.ok) break
       const d = await jsonOrNull<Paginated<RawTransaction>>(res)
       if (!d?.data) break
       for (const t of d.data) {
+        const placeName = t.details?.place?.name
+        const type = t.details?.type ?? "Unknown"
         txns.push({
           name: t.details?.name ?? "Unknown",
-          type: t.details?.type ?? "Unknown",
-          game: t.agent?.name ?? "Unknown",
+          type,
+          game: placeName ?? (type === "Asset" || type === "Bundle" ? "Avatar Shop" : t.agent?.name ?? "Unknown"),
           amount: Math.abs(t.currency?.amount ?? 0),
           created: t.created,
         })
       }
-      cursor = d.nextPageCursor ?? null
+      cursor = d.nextPageCursor ?? ""
       if (!cursor) break
     } catch {
       break
