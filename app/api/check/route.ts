@@ -4,18 +4,81 @@ const COOKIE_NAME = ".ROBLOSECURITY"
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
-async function robloxFetch(url: string, cookie: string): Promise<Response> {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 10_000)
-  try {
-    return await fetch(url, {
-      headers: { Cookie: cookie, "User-Agent": UA },
-      redirect: "follow",
-      signal: ctrl.signal,
-    })
-  } finally {
-    clearTimeout(timer)
+let lastRequestTime = 0
+const MIN_REQUEST_GAP_MS = 25
+
+async function throttle() {
+  const now = Date.now()
+  const elapsed = now - lastRequestTime
+  if (elapsed < MIN_REQUEST_GAP_MS) {
+    await sleep(MIN_REQUEST_GAP_MS - elapsed + Math.random() * 15)
   }
+  lastRequestTime = Date.now()
+}
+
+class RateLimitError extends Error {
+  retryAfterMs: number
+  constructor(retryAfterMs: number) {
+    super("Rate limited")
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
+const MAX_RETRIES = 4
+const BASE_DELAY_MS = 800
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+async function robloxFetch(
+  url: string,
+  cookie: string,
+  { retries = MAX_RETRIES, critical = false } = {},
+): Promise<Response> {
+  let lastErr: unknown
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    await throttle()
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 12_000)
+    try {
+      const res = await fetch(url, {
+        headers: { Cookie: cookie, "User-Agent": UA },
+        redirect: "follow",
+        signal: ctrl.signal,
+      })
+
+      if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
+        const retryAfter = parseInt(res.headers.get("retry-after") ?? "", 10)
+        const delayMs = !isNaN(retryAfter) && retryAfter > 0
+          ? retryAfter * 1000
+          : BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 300
+
+        if (attempt < retries) {
+          await sleep(Math.min(delayMs, 10_000))
+          continue
+        }
+
+        if (critical && res.status === 429) {
+          throw new RateLimitError(delayMs)
+        }
+      }
+
+      return res
+    } catch (err) {
+      lastErr = err
+      if (err instanceof RateLimitError) throw err
+      if (attempt < retries) {
+        await sleep(BASE_DELAY_MS * Math.pow(2, attempt))
+        continue
+      }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  throw lastErr ?? new Error("robloxFetch failed")
 }
 
 async function jsonOrNull<T>(res: Response): Promise<T | null> {
@@ -200,8 +263,32 @@ export async function POST(request: NextRequest) {
   const cookie = `${COOKIE_NAME}=${cookieValue}`
 
   try {
-    const authRes = await robloxFetch("https://users.roblox.com/v1/users/authenticated", cookie)
-    if (authRes.status !== 200) return NextResponse.json({ valid: false })
+    let authRes: Response
+    try {
+      authRes = await robloxFetch(
+        "https://users.roblox.com/v1/users/authenticated",
+        cookie,
+        { critical: true },
+      )
+    } catch (err) {
+      if (err instanceof RateLimitError) {
+        return NextResponse.json(
+          { error: "Rate limited by Roblox – try again with lower concurrency" },
+          { status: 429 },
+        )
+      }
+      throw err
+    }
+
+    if (authRes.status === 401 || authRes.status === 403) {
+      return NextResponse.json({ valid: false })
+    }
+    if (authRes.status !== 200) {
+      return NextResponse.json(
+        { error: `Roblox returned ${authRes.status} – may be temporary` },
+        { status: 502 },
+      )
+    }
 
     const auth = await jsonOrNull<{ id: number; name: string; displayName: string }>(authRes)
     if (!auth?.id) return NextResponse.json({ valid: false })

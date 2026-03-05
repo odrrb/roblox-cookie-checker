@@ -143,6 +143,14 @@ export function CookieChecker() {
             body: JSON.stringify({ cookieValue: init[i].value }),
           })
           const data = await res.json()
+
+          if (res.status === 429) {
+            cursor--
+            updateEntry(i, { status: "pending" })
+            await new Promise((r) => setTimeout(r, 3000 + Math.random() * 2000))
+            continue
+          }
+
           updateEntry(i, {
             status: data.error ? "error" : "done",
             result: data.error ? null : data,
